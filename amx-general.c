@@ -19,7 +19,6 @@ void initialize(struct Matrix* mat, int zeros)
 
 void matmul(struct Matrix* A, struct Matrix* B, struct Matrix* C)
 {
-  struct tileconfig_t cfg;
   int MAXROWS = 16;
   int MAXCOLS = 64 / sizeof(float);
   int MAXDIMS = min(MAXROWS, MAXCOLS);
@@ -33,6 +32,34 @@ void matmul(struct Matrix* A, struct Matrix* B, struct Matrix* C)
     /* case 1
      * [a] x [b] = [ab]
      */
+
+    struct tileconfig_t cfg;
+    cfg.palette_id = 1;
+    cfg.startRow = 0;
+
+    __tile a = 0, b = 1, c = 2;
+    cfg.cols[a] = A->ncols * sizeof(float);
+    cfg.rows[a] = A->nrows;
+    cfg.cols[b] = B->ncols * sizeof(float);
+    cfg.rows[b] = B->nrows;
+    cfg.cols[c] = C->ncols * sizeof(float);
+    cfg.rows[c] = C->nrows;
+
+    _tile_loadconfig(cfg);
+
+    float* addrA = A->base_addr + (A->startrow * A->totalcols) + A->startcol;
+    float* addrB = B->base_addr + (B->startrow * B->totalcols) + B->startcol;
+    float* addrC = C->base_addr + (C->startrow * C->totalcols) + C->startcol;
+
+    int strideA = sizeof(float) * A->totalcols;
+    int strideB = sizeof(float) * B->totalcols;
+    int strideC = sizeof(float) * C->totalcols;
+
+    _tile_loadd(a, addrA, strideA);
+    _tile_loadd(b, addrB, strideB);
+    _tile_dpbf16ps(c, a, b);
+    _tile_stored(c, addrC, strideC);
+    _tile_release();
   }
   else if (A->nrows > MAXROWS)
   {
@@ -40,12 +67,84 @@ void matmul(struct Matrix* A, struct Matrix* B, struct Matrix* C)
      * [a] x [c]  = [ac]
      * [b]          [bc]
      */
+    struct Matrix A1, A2, C1, C2;
+
+    A1.totalrows = A->totalrows;
+    A1.totalcols = A->totalcols;
+    A1.startrow = A->startrow;
+    A1.startcol = A->startcol;
+    A1.nrows = (A->nrows)/2; // the upper half of A
+    A1.ncols = A->ncols;
+    A1.base_addr = A->base_addr;
+
+    A2.totalrows = A->totalrows;
+    A2.totalcols = A->totalcols;
+    A2.startrow = A->startrow + (A->nrows)/2; // the lower half of A
+    A2.startcol = A->startcol;
+    A2.nrows = A->nrows - (A->nrows)/2;
+    A2.ncols = A->ncols;
+    A2.base_addr = A->base_addr;
+
+    C1.totalrows = C->totalrows;
+    C1.totalcols = C->totalcols;
+    C1.startrow = C->startrow;
+    C1.startcol = C->startcol;
+    C1.nrows = (C->nrows)/2; // the upper half of A
+    C1.ncols = C->ncols;
+    C1.base_addr = C->base_addr;
+
+    C2.totalrows = C->totalrows;
+    C2.totalcols = C->totalcols;
+    C2.startrow = C->startrow + (C->nrows)/2; // the lower half of A
+    C2.startcol = C->startcol;
+    C2.nrows = C->nrows - (C->nrows)/2;
+    C2.ncols = C->ncols;
+    C2.base_addr = C->base_addr;
+
+    multiply(&A1, B, &C1);
+    multiply(&A2, B, &C2);
   }
   else if (B->ncols > MAXCOLS)
   {
     /* case 3
      * [a] x [b c] = [ab ac]
      */
+     struct Matrix B1, B2, C1, C2;
+
+     B1.totalrows = B->totalrows;
+     B1.totalcols = B->totalcols;
+     B1.startrow = B->startrow;
+     B1.startcol = B->startcol;
+     B1.nrows = B->nrows;
+     B1.ncols = (B->ncols)/2; // the left half of B
+     B1.base_addr = B->base_addr;
+
+     B2.totalrows = B->totalrows;
+     B2.totalcols = B->totalcols;
+     B2.startrow = B->startrow;
+     B2.startcol = B->startcol + (B->ncols)/2;
+     B2.nrows = B->nrows;
+     B2.ncols = B->ncols - (B->ncols)/2; // the right half of B
+     B2.base_addr = B->base_addr;
+
+     C1.totalrows = C->totalrows;
+     C1.totalcols = C->totalcols;
+     C1.startrow = C->startrow;
+     C1.startcol = C->startcol;
+     C1.nrows = C->nrows;
+     C1.ncols = (C->ncols)/2; // the left half of C
+     C1.base_addr = C->base_addr;
+
+     C2.totalrows = C->totalrows;
+     C2.totalcols = C->totalcols;
+     C2.startrow = C->startrow; // the lower half of A
+     C2.startcol = C->startcol + (C->ncols)/2;
+     C2.nrows = C->nrows;
+     C2.ncols = C->ncols - (C->ncols)/2;
+     C2.base_addr = C->base_addr;
+
+     multiply(A, &B1, &C1);
+     multiply(A, &B2, &C2);
   }
   else if (A->ncols > MAXDIMS)
   {
