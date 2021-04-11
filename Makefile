@@ -3,7 +3,7 @@ app=amx
 CC = icc
 CCFLAGS = -Wall -O3 -DAMX -DBF16
 INC = amx.h
-SRC = amx.c main.c
+SRC = amx-general.c
 
 all:
 	mkdir -p bin

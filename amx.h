@@ -18,7 +18,7 @@ struct Matrix
   float* base_addr;
 };
 
-void initialize(struct Matrix* mat);
+void initialize(struct Matrix* mat, int zeros);
 
 struct tileconfig_t
 {
@@ -29,4 +29,5 @@ struct tileconfig_t
   uint8_t  rows[16];
 };
 
-void matmul(struct Matrix*, struct Matrix*, struct Matrix*);
+void multiply(struct Matrix*, struct Matrix*, struct Matrix*);
+void add(struct Matrix*, struct Matrix*);
