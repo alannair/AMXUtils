@@ -11,4 +11,4 @@ https://software.intel.com/content/www/us/en/develop/articles/installing-intel-o
 
 To build, use `make`
 Run using Intel SDE
-`sde64 -[spr|future] -- ./bin/amx` 
+`sde64 -[spr|future] -- ./bin/amx N` where N is the dimension of the input square matrix. Two NxN matrix get initialized with randomly generated values and multiplied together
