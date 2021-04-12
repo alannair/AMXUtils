@@ -4,8 +4,11 @@
 #include <stdint.h>
 #include <immintrin.h>
 #include <time.h>
+#include <sys/time.h>
 
 unsigned char config[64];
+
+static double rtclock();
 
 struct Matrix
 {
@@ -28,6 +31,8 @@ struct tileconfig_t
   uint16_t cols[16];
   uint8_t  rows[16];
 };
+
+struct tileconfig_t cfg;
 
 void multiply(struct Matrix*, struct Matrix*, struct Matrix*);
 void add(struct Matrix*, struct Matrix*);

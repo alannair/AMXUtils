@@ -6,6 +6,16 @@ int min(int a, int b)
   return b;
 }
 
+static double rtclock()
+{
+  struct timeval Tp;
+  int stat;
+  stat = gettimeofday (&Tp, NULL);
+  if (stat != 0)
+    printf ("Error return from gettimeofday: %d", stat);
+  return (Tp.tv_sec + Tp.tv_usec * 1.0e-6);
+}
+
 void initialize(struct Matrix* mat, int zeros)
 {
   int r = mat->totalrows;
@@ -14,7 +24,25 @@ void initialize(struct Matrix* mat, int zeros)
   mat->base_addr = (float*)malloc(sizeof(float)*r*c);
 
   for(int i=0; i < (r*c); ++i)
-    (mat->base_addr)[i] = zeros ? 0.0 : (float)(rand() % 10) / 5;
+    (mat->base_addr)[i] = zeros ? 0.0 : (float)(rand() % 10);
+}
+
+void check(struct Matrix* A, struct Matrix* B, struct Matrix* C)
+{
+  for (int r = 0; r < A->totalrows; ++r)
+  for (int c = 0; c < B->totalcols; ++c)
+  {
+    float q = 0.0;
+    for (int k = 0; k < A->totalcols; ++k)
+      q += *(A->base_addr + r*(A->totalcols) + k) *
+            *(B->base_addr + k*(B->totalcols) + c);
+    if (q != *(C->base_addr + r*(C->totalcols) + c))
+    {
+      printf("%f %f %f\n", *(A->base_addr), *(B->base_addr), *(C->base_addr));
+      printf("%f != C[%d,%d]\n", q, r, c);
+      // assert(0);
+    }
+  }
 }
 
 void add(struct Matrix* A, struct Matrix* B)
@@ -54,8 +82,6 @@ void multiply(struct Matrix* A, struct Matrix* B, struct Matrix* C)
     /* case 1
      * [a] x [b] = [ab]
      */
-
-    struct tileconfig_t cfg;
     cfg.palette_id = 1;
     cfg.startRow = 0;
 
@@ -77,11 +103,15 @@ void multiply(struct Matrix* A, struct Matrix* B, struct Matrix* C)
     int strideB = sizeof(float) * B->totalcols;
     int strideC = sizeof(float) * C->totalcols;
 
+    // printf("%f %d %f %d %f %d\n", *addrA, strideA, *addrB, strideB, *addrC, strideC);
+
     _tile_loadd(a, addrA, strideA);
     _tile_loadd(b, addrB, strideB);
     _tile_dpbf16ps(c, a, b);
     _tile_stored(c, addrC, strideC);
     _tile_release();
+
+    // printf("%f %f %f\n", *addrA, *addrB, *addrC);
   }
   else if (A->nrows > MAXROWS)
   {
@@ -258,15 +288,20 @@ int main(int argc, char* argv[])
   B.ncols = z;
   initialize(&B, 0);
 
-  A.totalrows = x;
-  A.totalcols = z;
-  A.startrow = 0;
-  A.startcol = 0;
-  A.nrows = x;
-  A.ncols = z;
+  C.totalrows = x;
+  C.totalcols = z;
+  C.startrow = 0;
+  C.startcol = 0;
+  C.nrows = x;
+  C.ncols = z;
   initialize(&C, 1);
 
+  double stime = rtclock();
   multiply(&A, &B, &C);
+  double etime = rtclock();
+  printf("TIME: %lf\n", etime - stime);
+
+  // check(&A, &B, &C);
 
   return 0;
 }
